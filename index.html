@@ -1,85 +1,99 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Подсчёт цветных жестов</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
-  <style>
-    body { font-family: sans-serif; text-align: center; padding-top: 20px; }
-    #webcam-container { margin: 20px auto; border: 2px solid #ccc; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; }
-    canvas { border-radius: 10px; }
-    button { padding: 15px 30px; font-size: 18px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
-    button:hover { background-color: #45a049; }
-    .counters { margin-top: 20px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Детектор жестов</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 20px; background-color: #f4f4f9; }
+        #webcam-container { margin: 20px auto; width: 300px; height: 300px; border: 5px solid #ddd; border-radius: 15px; overflow: hidden; background: #000; }
+        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background-color: #28a745; color: white; border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button:active { transform: translateY(2px); }
+        .result-box { background: white; padding: 15px; border-radius: 10px; display: inline-block; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    </style>
 </head>
 <body>
 
-<h1>Детектор жестов</h1>
+    <h1>Классификатор жестов</h1>
+    <button type="button" id="start-btn" onclick="init()">Запустить камеру</button>
 
-<button type="button" id="start-btn" onclick="init()">Включить камеру и запустить</button>
+    <div id="webcam-container"></div>
 
-<div id="webcam-container">
-    <div id="placeholder">Камера появится здесь</div>
-</div>
+    <div class="result-box">
+        <h2>Текущий жест: <span id="current">-</span></h2>
+        <h3>🟢 Зелёный: <span id="green">0</span></h3>
+        <h3>🟡 Жёлтый: <span id="yellow">0</span></h3>
+        <h3>🔴 Красный: <span id="red">0</span></h3>
+    </div>
 
-<h2>Текущий жест: <span id="current">-</span></h2>
+<script type="text/javascript">
+    const URL = "./"; // Файлы модели лежат в той же папке
 
-<div class="counters">
-    <h3>🟢 Зелёный: <span id="green">0</span></h3>
-    <h3>🟡 Жёлтый: <span id="yellow">0</span></h3>
-    <h3>🔴 Красный: <span id="red">0</span></h3>
-</div>
+    let model, webcam, lastGesture = "";
+    let counters = { Green: 0, Yellow: 0, Red: 0 };
 
-<script>
-// Путь "./" означает, что model.json, metadata.json и weights.bin 
-// лежат в той же папке на GitHub, что и этот файл.
-const URL = "./"; 
+    async function init() {
+        // Проверка: загрузилась ли библиотека tmImage
+        if (typeof tmImage === 'undefined') {
+            alert("Библиотеки еще загружаются, подождите секунду...");
+            return;
+        }
 
-let model, webcam, labelContainer, maxPredictions;
-let lastGesture = "";
+        document.getElementById("start-btn").style.display = "none";
+        
+        try {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
 
-let counters = {
-  Green: 0,
-  Yellow: 0,
-  Red: 0
-};
+            // Загрузка модели
+            model = await tmImage.load(modelURL, metadataURL);
+            
+            // Настройка камеры
+            webcam = new tmImage.Webcam(300, 300, true); 
+            await webcam.setup(); 
+            await webcam.play();
+            
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            window.requestAnimationFrame(loop);
+        } catch (e) {
+            console.error("Ошибка инициализации:", e);
+            alert("Не удалось запустить модель. Проверьте, лежат ли файлы model.json и metadata.json в папке репозитория.");
+        }
+    }
 
-async function init() {
-  // Скрываем кнопку и надпись после нажатия
-  document.getElementById("start-btn").style.display = "none";
-  document.getElementById("placeholder").innerText = "Загрузка модели...";
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
 
-  try {
-    const modelURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        let best = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
 
-    // Загружаем модель
-    model = await tmImage.load(modelURL, metadataURL);
-    maxPredictions = model.getTotalClasses();
+        const currentSpan = document.getElementById("current");
 
-    // Настройка веб-камеры
-    const flip = true; 
-    webcam = new tmImage.Webcam(300, 300, flip);
-    await webcam.setup(); 
-    await webcam.play();
-    
-    document.getElementById("placeholder").remove();
-    document.getElementById("webcam-container").appendChild(webcam.canvas);
-    
-    window.requestAnimationFrame(loop);
-  } catch (e) {
-    console.error(e);
-    alert("Ошибка при запуске: " + e.message);
-  }
-}
+        if (best.probability > 0.85) {
+            currentSpan.innerText = best.className;
 
-async function loop() {
-  webcam.update(); 
-  await predict();
-  window.requestAnimationFrame(loop);
-}
-
-async function predict() {
+            if (best.className !== lastGesture) {
+                // Регистронезависимый поиск (на всякий случай)
+                let foundKey = Object.keys(counters).find(key => key.toLowerCase() === best.className.toLowerCase());
+                
+                if (foundKey) {
+                    counters[foundKey]++;
+                    document.getElementById(foundKey.toLowerCase()).innerText = counters[foundKey];
+                }
+                lastGesture = best.className;
+            }
+        } else {
+            lastGesture = "";
+            currentSpan.innerText = "-";
+        }
+    }
+</script>
+</body>
+</html>
