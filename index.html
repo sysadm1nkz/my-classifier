@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Детектор жестов</title>
+    <title>Кері байланыс</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     
@@ -17,16 +17,16 @@
 </head>
 <body>
 
-    <h1>Классификатор жестов</h1>
-    <button type="button" id="start-btn" onclick="init()">Запустить камеру</button>
+    <h1>Бағдаршам әдісі</h1>
+    <button type="button" id="start-btn" onclick="init()">Іске қосу</button>
 
     <div id="webcam-container"></div>
 
     <div class="result-box">
-        <h2>Текущий жест: <span id="current">-</span></h2>
-        <h3>🟢 Зелёный: <span id="green">0</span></h3>
-        <h3>🟡 Жёлтый: <span id="yellow">0</span></h3>
-        <h3>🔴 Красный: <span id="red">0</span></h3>
+        <h2>Қазір көрсетіліп тұрған қол қимылы: <span id="current">-</span></h2>
+        <h3>🟢 Толық түсіндім: <span id="green">0</span></h3>
+        <h3>🟡 Жартылай түсіндім: <span id="yellow">0</span></h3>
+        <h3>🔴 Мүлде түсінбедім: <span id="red">0</span></h3>
     </div>
 
 <script type="text/javascript">
@@ -76,7 +76,7 @@
 
         const currentSpan = document.getElementById("current");
 
-        if (best.probability > 0.85) {
+        if (best.probability > 0.98) {
             currentSpan.innerText = best.className;
 
             if (best.className !== lastGesture) {
@@ -97,3 +97,4 @@
 </script>
 </body>
 </html>
+
