@@ -2,22 +2,43 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Подсчёт цветных жестов</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding-top: 20px; }
+    #webcam-container { margin: 20px auto; border: 2px solid #ccc; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; }
+    canvas { border-radius: 10px; }
+    button { padding: 15px 30px; font-size: 18px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
+    button:hover { background-color: #45a049; }
+    .counters { margin-top: 20px; }
+  </style>
 </head>
 <body>
 
+<h1>Детектор жестов</h1>
+
+<button type="button" id="start-btn" onclick="init()">Включить камеру и запустить</button>
+
+<div id="webcam-container">
+    <div id="placeholder">Камера появится здесь</div>
+</div>
+
 <h2>Текущий жест: <span id="current">-</span></h2>
 
-<h3>🟢 Зелёный: <span id="green">0</span></h3>
-<h3>🟡 Жёлтый: <span id="yellow">0</span></h3>
-<h3>🔴 Красный: <span id="red">0</span></h3>
+<div class="counters">
+    <h3>🟢 Зелёный: <span id="green">0</span></h3>
+    <h3>🟡 Жёлтый: <span id="yellow">0</span></h3>
+    <h3>🔴 Красный: <span id="red">0</span></h3>
+</div>
 
 <script>
-const URL = "https://teachablemachine.withgoogle.com/models/jP82LzME4/";
+// Путь "./" означает, что model.json, metadata.json и weights.bin 
+// лежат в той же папке на GitHub, что и этот файл.
+const URL = "./"; 
 
-let model, webcam;
+let model, webcam, labelContainer, maxPredictions;
 let lastGesture = "";
 
 let counters = {
@@ -27,50 +48,38 @@ let counters = {
 };
 
 async function init() {
-  model = await tmImage.load(
-    URL + "model.json",
-    URL + "metadata.json"
-  );
+  // Скрываем кнопку и надпись после нажатия
+  document.getElementById("start-btn").style.display = "none";
+  document.getElementById("placeholder").innerText = "Загрузка модели...";
 
-  webcam = new tmImage.Webcam(300, 300, true);
-  await webcam.setup();
-  await webcam.play();
+  try {
+    const modelURL = URL + "model.json";
+    const metadataURL = URL + "metadata.json";
 
-  document.body.appendChild(webcam.canvas);
-  window.requestAnimationFrame(loop);
+    // Загружаем модель
+    model = await tmImage.load(modelURL, metadataURL);
+    maxPredictions = model.getTotalClasses();
+
+    // Настройка веб-камеры
+    const flip = true; 
+    webcam = new tmImage.Webcam(300, 300, flip);
+    await webcam.setup(); 
+    await webcam.play();
+    
+    document.getElementById("placeholder").remove();
+    document.getElementById("webcam-container").appendChild(webcam.canvas);
+    
+    window.requestAnimationFrame(loop);
+  } catch (e) {
+    console.error(e);
+    alert("Ошибка при запуске: " + e.message);
+  }
 }
 
 async function loop() {
-  webcam.update();
+  webcam.update(); 
   await predict();
   window.requestAnimationFrame(loop);
 }
 
 async function predict() {
-  const prediction = await model.predict(webcam.canvas);
-  let best = prediction.reduce((a, b) =>
-    a.probability > b.probability ? a : b
-  );
-
-  if (best.probability > 0.9) {
-    document.getElementById("current").innerText = best.className;
-
-    if (best.className !== lastGesture) {
-      if (counters.hasOwnProperty(best.className)) {
-        counters[best.className]++;
-        document.getElementById(best.className.toLowerCase())
-          .innerText = counters[best.className];
-      }
-      lastGesture = best.className;
-    }
-  } else {
-    lastGesture = "";
-    document.getElementById("current").innerText = "-";
-  }
-}
-
-init();
-</script>
-
-</body>
-</html>
