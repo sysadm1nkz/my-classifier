@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Подсчёт цветных жестов</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+</head>
+<body>
+
+<h2>Текущий жест: <span id="current">-</span></h2>
+
+<h3>🟢 Зелёный: <span id="green">0</span></h3>
+<h3>🟡 Жёлтый: <span id="yellow">0</span></h3>
+<h3>🔴 Красный: <span id="red">0</span></h3>
+
+<script>
+const URL = "https://teachablemachine.withgoogle.com/models/jP82LzME4/";
+
+let model, webcam;
+let lastGesture = "";
+
+let counters = {
+  Green: 0,
+  Yellow: 0,
+  Red: 0
+};
+
+async function init() {
+  model = await tmImage.load(
+    URL + "model.json",
+    URL + "metadata.json"
+  );
+
+  webcam = new tmImage.Webcam(300, 300, true);
+  await webcam.setup();
+  await webcam.play();
+
+  document.body.appendChild(webcam.canvas);
+  window.requestAnimationFrame(loop);
+}
+
+async function loop() {
+  webcam.update();
+  await predict();
+  window.requestAnimationFrame(loop);
+}
+
+async function predict() {
+  const prediction = await model.predict(webcam.canvas);
+  let best = prediction.reduce((a, b) =>
+    a.probability > b.probability ? a : b
+  );
+
+  if (best.probability > 0.9) {
+    document.getElementById("current").innerText = best.className;
+
+    if (best.className !== lastGesture) {
+      if (counters.hasOwnProperty(best.className)) {
+        counters[best.className]++;
+        document.getElementById(best.className.toLowerCase())
+          .innerText = counters[best.className];
+      }
+      lastGesture = best.className;
+    }
+  } else {
+    lastGesture = "";
+    document.getElementById("current").innerText = "-";
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
